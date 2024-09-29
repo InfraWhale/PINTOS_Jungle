@@ -242,13 +242,13 @@ tid_t thread_create(const char *name, int priority,
 
 	check_priority_threads(thread_get_priority());
 
-	struct thread *t_cur = thread_current();
+	//struct thread *t_cur = thread_current();
 
-	if (t_cur->priority < priority) {
-		// enum intr_level old_level = intr_disable();
-		thread_yield();
-		// intr_set_level(old_level);
-	}
+	// if (t_cur->priority < priority) {
+	// 	// enum intr_level old_level = intr_disable();
+	// 	thread_yield();
+	// 	// intr_set_level(old_level);
+	// }
 
 	return tid;
 }
@@ -526,7 +526,7 @@ kernel_thread(thread_func *function, void *aux)
 /* T를 NAME이라는 이름의 차단된 스레드로 기본 초기화합니다. */
 static void
 init_thread(struct thread *t, const char *name, int priority)
-{
+{	
 	ASSERT(t != NULL);
 	ASSERT(PRI_MIN <= priority && priority <= PRI_MAX);
 	ASSERT(name != NULL);
@@ -542,6 +542,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	struct list donation_list;
+	list_init(&donation_list);
+	t->donations = donation_list;
 }
 
 /* 스케줄링될 다음 스레드를 선택하고 반환합니다.

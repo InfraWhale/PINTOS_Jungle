@@ -93,6 +93,10 @@ struct thread {
 	int priority;                       /* Priority. */
 	int64_t wake_ticks;
 
+	struct lock *wait_on_lock; /* 이 쓰레드가 현재 풀리기를 기다리는 lock */
+	struct list donations; /*이 쓰레드에 기부한 쓰레드들*/
+	struct list_elem d_elem; /*donations에 쓰이는 list element*/
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -149,4 +153,8 @@ void check_thread_tick(int64_t);
 
 bool less_wake_ticks(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 bool better_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
 #endif /* threads/thread.h */

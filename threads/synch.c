@@ -197,7 +197,19 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+   if(lock->holder != NULL) {
+      thread_current () -> wait_on_lock = lock;
+      // TODO : 현재 우선순위 저장 및, 우선순위 기부 한 쓰레드들 리스트에 관리
+      // TODO : 우선순위 기부
+      if(lock->holder->priority < thread_current()->priority) {
+         thread_set_priority()
+      }
+   }
+   
 	sema_down (&lock->semaphore);
+
+   thread_current () -> wait_on_lock = NULL;
+
 	lock->holder = thread_current ();
 }
 
