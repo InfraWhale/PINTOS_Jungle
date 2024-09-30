@@ -67,7 +67,8 @@ sema_down (struct semaphore *sema) {
 	old_level = intr_disable ();
 	while (sema->value == 0) { // while문이므로, sema value 0인 동안 대기
 		list_insert_ordered(&sema->waiters, &thread_current ()->elem, better_priority, NULL);
-		thread_block ();
+      
+      thread_block ();
 	}
 	sema->value--;
 	intr_set_level (old_level);
@@ -110,6 +111,7 @@ sema_up (struct semaphore *sema) {
 	struct thread *next_thread;
     old_level = intr_disable();
     if (!list_empty(&sema->waiters)) {
+         list_sort(&sema->waiters, better_priority, NULL);  // 정렬 로직 추가 ... 왜 추가해주지?
         next_thread = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
         thread_unblock(next_thread);
 		// 이 위치에 새 코드를 넣었을 땐 터졌었음
@@ -119,10 +121,10 @@ sema_up (struct semaphore *sema) {
 	intr_set_level (old_level);
 
 	// 인터럽트 컨텍스트가 아닐때 실행되어야 한다 (즉 일반 스레드 실행 컨텍스트에서 실행하여야 한다.)
-	// if (!intr_context() && next_thread != NULL && next_thread->priority > thread_current()->priority) { // 위 이유로 !intr_context()가 추가되었는데 없어도 돌아는 간다.
-	if (next_thread != NULL && next_thread->priority > thread_current()->priority) {
+	if (!intr_context() && next_thread != NULL && next_thread->priority > thread_current()->priority) { // 위 이유로 !intr_context()가 추가되었는데 없어도 돌아는 간다.
+	//if (next_thread != NULL && next_thread->priority > thread_current()->priority) {
         thread_yield();
-    }
+   }
 }
 
 static void sema_test_helper (void *sema_);
@@ -199,11 +201,10 @@ lock_acquire (struct lock *lock) {
 
    if(lock->holder != NULL) {
       thread_current () -> wait_on_lock = lock;
-      // TODO : 현재 우선순위 저장 및, 우선순위 기부 한 쓰레드들 리스트에 관리
+      // TODO : 우선순위 기부 한 쓰레드들 리스트에 관리
+      list_push_back(&lock->holder->donations, &thread_current()->d_elem);
       // TODO : 우선순위 기부
-      if(lock->holder->priority < thread_current()->priority) {
-         thread_set_priority()
-      }
+      donate_priority();
    }
    
 	sema_down (&lock->semaphore);
@@ -242,6 +243,9 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+   remove_with_lock(lock);
+   refresh_priority();
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);

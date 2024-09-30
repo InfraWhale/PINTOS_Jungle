@@ -415,9 +415,23 @@ void thread_yield(void)
 /* 현재 스레드의 우선 순위를 NEW_PRIORITY로 설정합니다. */
 void thread_set_priority(int new_priority)
 {
-	// list_entry(list_front(&sleep_list), struct thread, elem)->wake_ticks
-	thread_current()->priority = new_priority;
-	check_priority_threads(new_priority);
+	struct thread *cur_t = thread_current();
+	// 기부 상황인 경우
+	if( cur_t->priority != cur_t->init_priority ) {
+		cur_t->init_priority = new_priority;
+		// 새로운 우선순위가 기부받은 우선순위보다 높다면
+		if(new_priority > cur_t->priority) {
+			cur_t->priority = new_priority;
+			check_priority_threads(new_priority);
+		}
+	}
+	else { // 기부 상황이 아닌 경우
+		cur_t->init_priority = new_priority;
+		cur_t->priority = new_priority;
+		check_priority_threads(new_priority);
+	}
+	// cur_t->priority = new_priority;
+	// check_priority_threads(new_priority);
 }
 
 void check_priority_threads(int priority)
@@ -543,9 +557,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
-	struct list donation_list;
-	list_init(&donation_list);
-	t->donations = donation_list;
+	list_init(&t->donations);
+	t->init_priority =priority;
 }
 
 /* 스케줄링될 다음 스레드를 선택하고 반환합니다.
@@ -730,4 +743,71 @@ allocate_tid(void)
 	lock_release(&tid_lock); // 락 해제
 
 	return tid; // 할당된 tid 반환
+}
+
+void donate_priority(void)
+{
+	struct thread *cur_t = thread_current();
+	int priority_tobe = cur_t->priority;
+	struct thread *next_t = cur_t->wait_on_lock ? cur_t->wait_on_lock->holder : NULL;
+	while (next_t != NULL)
+	{
+		if (priority_tobe > next_t->priority)
+		{
+			next_t->priority = priority_tobe;
+		}
+
+		// 다음 스레드가 잠금을 기다리고 있는지 확인
+        if (next_t->wait_on_lock != NULL)
+        {
+            next_t = next_t->wait_on_lock->holder;
+        }
+        else
+        {
+            // 더 이상 잠금을 기다리지 않는 스레드라면 루프 종료
+            break;
+        }
+	}
+}
+
+void remove_with_lock(struct lock *lock) {
+    struct thread *cur_t = thread_current();
+    struct list_elem *e = list_begin(&cur_t->donations);
+    while (e != list_end(&cur_t->donations)) {
+        struct thread *now_t = list_entry(e, struct thread, d_elem);
+        struct list_elem *next = e->next;//list_next(e);  // Save next element before removing
+
+        if (now_t->wait_on_lock == lock) {
+            list_remove(e);  // Remove current element
+        }
+
+        e = next;  // Move to next element
+    }
+}
+
+void refresh_priority(void)
+{
+	struct thread *cur_t = thread_current();
+	struct list cur_donations = cur_t->donations;
+	struct list_elem *e;
+	
+	cur_t->priority = cur_t->init_priority;
+
+	int max_priority = 0;
+
+	if(!list_empty(&cur_t->donations))
+	{
+		for (e = list_begin (&cur_t->donations); e != list_end (&cur_t->donations); e = e->next) 
+		{
+			struct thread *now_t = list_entry(e, struct thread, d_elem);
+			if (now_t->priority > max_priority) 
+			{
+				max_priority = now_t->priority;
+			}
+		}
+	}
+	if(max_priority > cur_t->priority)
+	{
+		cur_t->priority = max_priority;
+	}
 }
