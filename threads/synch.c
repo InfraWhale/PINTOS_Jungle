@@ -270,6 +270,9 @@ struct semaphore_elem {
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
+
+// conditional var의 세마포어는 2개임을 명시할 것
+
 void
 cond_init (struct condition *cond) {
 	ASSERT (cond != NULL);
